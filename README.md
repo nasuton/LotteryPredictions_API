@@ -1,0 +1,2 @@
+# LotteryPredictions_API
+MySQLに登録されているデータを取得するAPI
