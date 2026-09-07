@@ -1,0 +1,15 @@
+# 環境変数ファイル (秘密情報を含むためコミットしない)
+.env
+.env*
+
+# ビルド成果物
+/LotteryPredictions_API
+/LotteryPredictions_API.exe
+*.exe
+*.test
+*.out
+
+# IDE
+.idea/
+.vscode/
+
