@@ -3,8 +3,6 @@ package repository
 import (
 	"context"
 	"database/sql"
-	"strings"
-	"time"
 
 	"LotteryPredictions_API/internal/model"
 )
@@ -12,24 +10,13 @@ import (
 // selectColumns は lottery_predictions の取得対象カラム
 const selectColumns = `id, lottery_type, pattern, predicted_at, numbers`
 
-// dateLayout は predicted_at (DATE型) の比較用フォーマット
-const dateLayout = "2006-01-02"
-
-// buildWhere は lottery_type と「サーバーの現在日付 = predicted_at」の条件を組み立てる
+// buildWhere は lottery_type の絞り込み条件を組み立てる。日付では制限しない。
 func buildWhere(lotteryType string) (string, []any) {
-	conds := make([]string, 0, 2)
-	args := make([]any, 0, 2)
-
-	if lotteryType != "" {
-		conds = append(conds, `lottery_type = ?`)
-		args = append(args, lotteryType)
+	if lotteryType == "" {
+		return "", nil
 	}
 
-	// サーバー(アプリ)の現在日付と predicted_at が同じものだけに絞り込む
-	conds = append(conds, `predicted_at = ?`)
-	args = append(args, time.Now().Format(dateLayout))
-
-	return ` WHERE ` + strings.Join(conds, ` AND `), args
+	return ` WHERE lottery_type = ?`, []any{lotteryType}
 }
 
 // LotteryRepository は lottery_predictions テーブルへのアクセスを担当する

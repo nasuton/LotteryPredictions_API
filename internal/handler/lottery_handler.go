@@ -23,8 +23,10 @@ func NewLotteryHandler(repo *repository.LotteryRepository) *LotteryHandler {
 // List GET /api/predictions?lottery_type=loto6&limit=20&offset=0
 func (h *LotteryHandler) List(c *gin.Context) {
 	limit, err := strconv.Atoi(c.DefaultQuery("limit", "20"))
-	if err != nil || limit <= 0 || limit > 100 {
+	if err != nil || limit <= 0 {
 		limit = 20
+	} else if limit > 100 {
+		limit = 100
 	}
 	offset, err := strconv.Atoi(c.DefaultQuery("offset", "0"))
 	if err != nil || offset < 0 {
@@ -46,11 +48,24 @@ func (h *LotteryHandler) List(c *gin.Context) {
 		return
 	}
 
+	// 同じ API オリジンに対する相対 URL。検索条件と BASE_PATH を引き継ぐ。
+	var nextURL *string
+	if len(predictions) > 0 && int64(limit) < total-int64(offset) {
+		next := *c.Request.URL
+		query := next.Query()
+		query.Set("limit", strconv.Itoa(limit))
+		query.Set("offset", strconv.FormatInt(int64(offset)+int64(limit), 10))
+		next.RawQuery = query.Encode()
+		url := next.RequestURI()
+		nextURL = &url
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"data":   predictions,
-		"total":  total,
-		"limit":  limit,
-		"offset": offset,
+		"data":     predictions,
+		"total":    total,
+		"limit":    limit,
+		"offset":   offset,
+		"next_url": nextURL,
 	})
 }
 
