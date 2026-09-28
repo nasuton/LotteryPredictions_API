@@ -11,6 +11,19 @@ import (
 // dateLayout は predicted_at (DATE型) の入出力フォーマット
 const dateLayout = "2006-01-02"
 
+// LotteryTypes は API が受け付ける lottery_type の一覧
+var LotteryTypes = []string{"loto6", "loto7", "miniloto", "numbers3", "numbers4"}
+
+// IsValidLotteryType は lottery_type が許可値かどうかを返す
+func IsValidLotteryType(v string) bool {
+	for _, t := range LotteryTypes {
+		if t == v {
+			return true
+		}
+	}
+	return false
+}
+
 // Date は DATE 型カラム用。JSON では "2006-01-02" 形式で入出力する
 type Date time.Time
 
@@ -104,4 +117,22 @@ func (p LotteryPrediction) MarshalJSON() ([]byte, error) {
 		Numbers:    p.NumberList(),
 		NumbersRaw: p.Numbers,
 	})
+}
+
+// TypeSummary は lottery_type ごとの件数と最新予測日 (/api/v1/status 用)
+type TypeSummary struct {
+	LotteryType       string `json:"lottery_type"`
+	Count             int64  `json:"count"`
+	LatestPredictedAt Date   `json:"latest_predicted_at"`
+}
+
+// BatchRun は batch_runs テーブルの1レコード (バッチ側 nasuton/Lottery が記録する)
+type BatchRun struct {
+	BatchName    string    `json:"batch_name"`
+	LotteryType  string    `json:"lottery_type"`
+	Status       string    `json:"status"`
+	StartedAt    time.Time `json:"started_at"`
+	FinishedAt   time.Time `json:"finished_at"`
+	RowsAffected int64     `json:"rows_affected"`
+	Message      string    `json:"message"`
 }
