@@ -1,0 +1,22 @@
+# Apache リバースプロキシ設定例 (https://nasuton.com/lottery → 127.0.0.1:8080/lottery)
+#
+# 前提:
+#   - API 側は BASE_PATH=/lottery, PORT=8080, TRUSTED_PROXIES=127.0.0.1,::1 で起動している
+#   - 必要モジュール: sudo a2enmod proxy proxy_http headers
+#   - 既存の HTTPS VirtualHost (例: /etc/apache2/sites-available/nasuton.com-le-ssl.conf) の
+#     <VirtualHost *:443> ブロック内に以下を追記し、sudo apachectl configtest && sudo systemctl reload apache2
+
+<IfModule mod_proxy.c>
+    ProxyRequests Off
+    ProxyPreserveHost On
+
+    # クライアント IP / プロトコルを API に伝える (API 側は TRUSTED_PROXIES で 127.0.0.1 を信頼する)
+    RequestHeader set X-Forwarded-Proto "https"
+    RequestHeader set X-Forwarded-Port "443"
+
+    # /lottery 配下をそのまま転送する。末尾スラッシュの有無を両側で揃えること
+    #   /lottery/health, /lottery/healthz, /lottery/readyz
+    #   /lottery/api/v1/predictions, /lottery/api/v1/status, /lottery/api/predictions (互換)
+    ProxyPass        /lottery http://127.0.0.1:8080/lottery retry=0 timeout=30 connectiontimeout=5
+    ProxyPassReverse /lottery http://127.0.0.1:8080/lottery
+</IfModule>

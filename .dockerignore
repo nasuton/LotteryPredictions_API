@@ -1,0 +1,15 @@
+.git
+.github
+.gitignore
+.gitattributes
+.idea
+.vscode
+.env
+.env.*
+!.env.example
+*.exe
+*.test
+*.out
+*.md
+deploy/
+LotteryPredictions_API

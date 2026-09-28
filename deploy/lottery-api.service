@@ -1,0 +1,70 @@
+# /etc/systemd/system/lottery-api.service
+#
+# 配置手順:
+#   sudo useradd --system --no-create-home --shell /usr/sbin/nologin lottery-api
+#   sudo install -d -o root -g root -m 755 /opt/lottery-api
+#   sudo install -o root -g root -m 755 ./lottery-api /opt/lottery-api/lottery-api
+#   sudo install -o root -g lottery-api -m 640 .env /etc/lottery-api.env   # 実値を記入したもの
+#   sudo cp deploy/lottery-api.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now lottery-api
+#   journalctl -u lottery-api -f
+
+[Unit]
+Description=Lottery Predictions API (Gin)
+Documentation=https://github.com/nasuton/LotteryPredictions_API
+After=network-online.target mysql.service mariadb.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=lottery-api
+Group=lottery-api
+WorkingDirectory=/opt/lottery-api
+EnvironmentFile=/etc/lottery-api.env
+ExecStart=/opt/lottery-api/lottery-api
+
+# 異常終了時のみ再起動 (設定エラーによる exit 1 の無限ループを避けるため間隔を空ける)
+Restart=on-failure
+RestartSec=5s
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+# graceful shutdown: SIGTERM → アプリ側 SHUTDOWN_TIMEOUT (既定 10s) → 15s で SIGKILL
+KillSignal=SIGTERM
+KillMode=mixed
+TimeoutStopSec=15
+
+# ログは stdout/stderr (JSON) → journald
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lottery-api
+
+# ---- hardening ----
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+# @system-service は Go ランタイムが必要とする setrlimit 等を含む。拒否時は kill ではなく EPERM を返す
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=
+AmbientCapabilities=
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
