@@ -35,8 +35,7 @@ func wrapErr(err error) error {
 	return err
 }
 
-// LotteryRepository は lottery_predictions / batch_runs テーブルへのアクセスを担当する。
-// PredictionRepository と StatusRepository の両方を実装する。
+// LotteryRepository は予測・ヒット率・バッチ実行テーブルへのアクセスを担当する。
 type LotteryRepository struct {
 	db *sql.DB
 }
@@ -44,6 +43,7 @@ type LotteryRepository struct {
 var (
 	_ PredictionRepository = (*LotteryRepository)(nil)
 	_ StatusRepository     = (*LotteryRepository)(nil)
+	_ HitRateRepository    = (*LotteryRepository)(nil)
 )
 
 func NewLotteryRepository(db *sql.DB) *LotteryRepository {

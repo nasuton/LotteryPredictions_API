@@ -37,3 +37,12 @@ type StatusRepository interface {
 	// batch_runs テーブルが存在しない場合は ErrTableNotFound を返す
 	LastBatchRuns(ctx context.Context) ([]model.BatchRun, error)
 }
+
+// HitRateRepository はパターン別ヒット率の読み取りを抽象化する。
+type HitRateRepository interface {
+	// FindHitRates は lottery_type, pattern の昇順でページ単位に返す。
+	// lotteryType が空なら種別を絞り込まない。
+	FindHitRates(ctx context.Context, lotteryType string, limit, offset int) ([]model.LotteryHitRate, error)
+	// CountHitRates は絞り込み後の総件数を返す。
+	CountHitRates(ctx context.Context, lotteryType string) (int64, error)
+}

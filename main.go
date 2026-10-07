@@ -79,6 +79,7 @@ func run() int {
 		Logger:      logger,
 		Predictions: repo,
 		Status:      repo,
+		HitRates:    repo,
 		Pinger:      db,
 	})
 	if err != nil {

@@ -1,6 +1,6 @@
 # LotteryPredictions_API
 
-MySQL に登録された宝くじ予測データ (`lottery_predictions`) を返す読み取り専用 API です。
+MySQL に登録された宝くじ予測データ (`lottery_predictions`) とパターン別ヒット率 (`lottery_hit_rates`) を返す読み取り専用 API です。
 Go 1.26 / Gin 製。バッチ側 ([nasuton/Lottery](https://github.com/nasuton/Lottery)) が書き込み、
 フロント ([nasuton/LotteryPredictions](https://github.com/nasuton/LotteryPredictions), GitHub Pages) が参照します。
 
@@ -14,10 +14,12 @@ Go 1.26 / Gin 製。バッチ側 ([nasuton/Lottery](https://github.com/nasuton/L
 | --- | --- |
 | `/api/v1/predictions` | 予測データ一覧 (ページング) |
 | `/api/v1/predictions/:id` | 予測データ 1 件 |
+| `/api/v1/lottery_hit_rates` | ロト種別・予想パターンごとの最新ヒット率一覧 (ページング) |
 | `/api/v1/status` | 種別ごとの件数・最新予測日と、バッチの最終実行状況 |
 | `/healthz` | liveness。DB に触れず常に `200 {"status":"ok"}` |
 | `/readyz` | readiness。DB に `PingContext` (1 秒) が通れば `200 {"status":"ok"}`、失敗なら `503 {"status":"ng"}` |
 | `/api/predictions`, `/api/predictions/:id` | **互換用 (無印)**。v1 と同じ handler。**将来廃止予定**なので新規クライアントは v1 を使ってください |
+| `/api/lottery_hit_rates` | 無印のヒット率一覧。v1 と同じ handler |
 | `/health` | **互換用**。`/readyz` と同じ挙動 |
 
 無印パスと `/health` のレスポンス形 (`data`, `total`, `limit`, `offset`, `next_url`, `{"status":"ok"}`) は変更していません。
@@ -56,6 +58,62 @@ Go 1.26 / Gin 製。バッチ側 ([nasuton/Lottery](https://github.com/nasuton/L
 
 `{"data": {...}}` を返します。`id` が正の整数でなければ `400 invalid_id`、存在しなければ `404 not_found`。
 
+### ヒット率取得 `GET /api/v1/lottery_hit_rates`
+
+`lottery_hit_rates` テーブルの全カラムを、`lottery_type` 昇順・`pattern` 昇順で返します。
+予測数字の一覧と同じ `limit` / `offset` / `next_url` によるページングに対応します。
+
+| パラメーター | 動作 |
+| --- | --- |
+| `lottery_type` | 任意。省略時は全種別。`loto6` / `loto7` / `miniloto` のいずれか。それ以外 (`numbers3` / `numbers4` を含む) は `400 invalid_lottery_type` |
+| `limit` | 1 回の取得件数。省略時 20、最大 100。100 超は 100 に、不正値や 0 以下は 20 に調整 |
+| `offset` | 読み飛ばす件数。省略時・不正値・負数は 0 |
+
+```sh
+curl "http://localhost:8080/api/v1/lottery_hit_rates?lottery_type=loto6&limit=100&offset=0"
+# BASE_PATH=/lottery の場合
+curl "https://nasuton.com/lottery/api/v1/lottery_hit_rates?lottery_type=loto6&limit=100&offset=0"
+```
+
+```json
+{
+  "data": [
+    {
+      "lottery_type": "loto6",
+      "pattern": "frequency",
+      "prediction_count": 120,
+      "mean_hits": 1.25,
+      "hit_rate": 12.5,
+      "match_3_rate": 10,
+      "match_4_rate": 2.5,
+      "match_5_rate": 0,
+      "match_6_rate": 0,
+      "match_7_rate": null,
+      "created_at": "2026-10-07T12:00:00+09:00",
+      "updated_at": "2026-10-07T12:00:00+09:00"
+    }
+  ],
+  "total": 1,
+  "limit": 20,
+  "offset": 0,
+  "next_url": null
+}
+```
+
+`total` は絞り込み後の総件数で、現在のページの件数ではありません。
+`next_url` は種別・クエリ・`BASE_PATH`・呼ばれたパス (v1 / 無印) を引き継ぐ相対 URL です。
+全件取得する場合は `next_url` が `null` になるまで繰り返してください。
+例えば 112 件ある場合、`limit=112` は 100 件に調整され、次ページは `offset=100` で残り 12 件を返します。
+該当データがなければ `200` で `data: []`, `total: 0`, `next_url: null` を返します。
+`offset` が総件数以上の場合も `200` で `data: []`, `next_url: null` を返し、`total` は総件数のままです。
+`hit_rate` は 3 個以上一致率、`match_N_rate` は N 個一致率で、すべて 0〜100 の数値です (例: `12.5` = 12.5%)。
+対象外の一致率は `null` (loto6 の `match_7_rate`、miniloto の `match_6_rate` / `match_7_rate`) です。
+`created_at` / `updated_at` は DB 接続のタイムゾーン (`loc=Local`) に基づく RFC 3339 形式です。
+
+テーブルは Python バッチ側と同じデータベースを参照します。未作成の場合は
+`db/create_lottery_hit_rates.sql` (バッチ側と同一定義) を適用してください。
+テーブル未作成や DB 障害時は `500 internal_error` を返します。
+
 ### 状況取得 `GET /api/v1/status`
 
 ```json
@@ -88,6 +146,7 @@ Go 1.26 / Gin 製。バッチ側 ([nasuton/Lottery](https://github.com/nasuton/L
 | --- | --- | --- |
 | `Cache-Control` | 一覧・単一取得 | `public, max-age=300, stale-while-revalidate=600` |
 | `Cache-Control` | `/api/v1/status` | `public, max-age=300` |
+| `Cache-Control` | ヒット率一覧 | `public, max-age=300` (ETag なし) |
 | `Cache-Control` | エラー・ヘルスチェック | `no-store` |
 | `ETag` | 一覧・単一取得 | 弱い ETag (`W/"<sha1>"`)。一覧は `lottery_type|limit|offset|MAX(predicted_at)|COUNT(*)|MAX(id)`、単一はレコード内容から算出。`updated_at` 列に依存しないため列が無い DB でも動く |
 | `X-Request-ID` | 全レスポンス | リクエストに付いていれば流用 (印字可能 ASCII・128 文字以内)、無ければ 16 byte の乱数 hex |

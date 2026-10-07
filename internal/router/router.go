@@ -24,6 +24,7 @@ type Deps struct {
 	Logger      *slog.Logger
 	Predictions repository.PredictionRepository
 	Status      repository.StatusRepository
+	HitRates    repository.HitRateRepository
 	Pinger      handler.Pinger
 }
 
@@ -59,6 +60,7 @@ func New(d Deps) (*gin.Engine, error) {
 	health := handler.NewHealthHandler(d.Pinger, readinessTimeout, logger)
 	lottery := handler.NewLotteryHandler(d.Predictions, logger)
 	status := handler.NewStatusHandler(d.Status, logger)
+	hitRates := handler.NewHitRateHandler(d.HitRates, logger)
 
 	// BASE_PATH ("/lottery" など) を全ルートの先頭に付ける。
 	// 未設定ならルート直下 (/health, /api/...) になる。
@@ -73,11 +75,13 @@ func New(d Deps) (*gin.Engine, error) {
 		// 互換: 無印パス。将来的に廃止予定。v1 と同じ handler を登録する
 		api.GET("/predictions", lottery.List)
 		api.GET("/predictions/:id", lottery.Get)
+		api.GET("/lottery_hit_rates", hitRates.List)
 
 		v1 := api.Group("/v1")
 		v1.GET("/predictions", lottery.List)
 		v1.GET("/predictions/:id", lottery.Get)
 		v1.GET("/status", status.Status)
+		v1.GET("/lottery_hit_rates", hitRates.List)
 	}
 
 	return r, nil

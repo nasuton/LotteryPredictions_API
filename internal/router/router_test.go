@@ -36,6 +36,12 @@ func (stubRepo) Snapshot(context.Context, string) (repository.Snapshot, error) {
 func (stubRepo) CountByType(context.Context) ([]model.TypeSummary, error) { return nil, nil }
 func (stubRepo) LastBatchRuns(context.Context) ([]model.BatchRun, error)  { return nil, nil }
 
+func (stubRepo) FindHitRates(context.Context, string, int, int) ([]model.LotteryHitRate, error) {
+	return []model.LotteryHitRate{}, nil
+}
+
+func (stubRepo) CountHitRates(context.Context, string) (int64, error) { return 0, nil }
+
 type stubPinger struct{}
 
 func (stubPinger) PingContext(context.Context) error { return nil }
@@ -53,6 +59,7 @@ func newTestRouter(t *testing.T, basePath string, origins []string) *gin.Engine 
 		Logger:      slog.New(slog.NewTextHandler(io.Discard, nil)),
 		Predictions: stubRepo{},
 		Status:      stubRepo{},
+		HitRates:    stubRepo{},
 		Pinger:      stubPinger{},
 	})
 	if err != nil {
@@ -74,6 +81,7 @@ func TestRoutes(t *testing.T) {
 			"/health", "/healthz", "/readyz",
 			"/api/predictions", "/api/predictions/1",
 			"/api/v1/predictions", "/api/v1/predictions/1", "/api/v1/status",
+			"/api/lottery_hit_rates", "/api/v1/lottery_hit_rates",
 		}
 		for _, p := range paths {
 			w := get(r, base+p)
